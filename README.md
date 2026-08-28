@@ -75,6 +75,25 @@ editor does not offer, or a piece that does not exist, is a step a test catches.
 Recording turns vsync off, because an editor asks for a frame only when
 something changed and a recording wants every frame it can draw.
 
+## Chapters
+
+The tile tools draw a board one square at a time, which is right for the last
+tenth of the work and wrong for the first nine. **Story → *fragment* → *variant***
+appends a chapter from the game's library to the end of the board: entered where
+the board currently ends, leaving somewhere new, bringing its own walls,
+mechanisms and surfaces — and then the tile tools are there to change it.
+
+That is the argument for putting the library in an editor rather than in a
+generator. A generated board is somebody else's board; a board with three
+chapters in it and an hour of tile edits on top is yours.
+
+A chapter is **one press of undo**, however many tiles it laid. The finish moves
+to the end of what was added, so chapters chain.
+
+The menu is the library, and the library is discovered by scanning its own
+directory — a fragment added to the game appears here without the editor being
+told about it.
+
 ## Boards
 
 A board is a `.marble` file: JSON, one cell to a line and one mechanism to a

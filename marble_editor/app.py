@@ -57,6 +57,7 @@ from marble_editor.board import (  # noqa: E402
     BoardEditor,
     blank,
 )
+from marble_editor.chapters import CHAPTERS, add_chapter  # noqa: E402
 from marble_editor.controls import ZOOM_STEP, MapControls  # noqa: E402
 from marble_editor.editing import MechanismTool, SurfaceTool, editor_tools  # noqa: E402
 from marble_editor.status import EditorStatus  # noqa: E402
@@ -73,6 +74,11 @@ MENU_BAR_ROOM = 30.0
 #: How much board is left round the edge when the view is fitted to it, as a
 #: fraction: a board drawn to the window's edge looks like a board that runs off.
 MARGIN = 0.15
+
+
+def _titled(name):
+    """A fragment's name as a menu reads it."""
+    return name.replace('_', ' ').capitalize()
 
 
 def board_bounds(level, margin=MARGIN):
@@ -364,6 +370,7 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
                 MenuItem(text='Start again from a generated board',
                          on_activate=lambda w: self._regenerate()),
             ]),
+            ('Story', self._chapter_items()),
             ('Place', self._mechanism_items()),
             ('Surface', self._surface_items()),
             ('View', [
@@ -375,6 +382,35 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
                          on_activate=lambda w: self.controls.zoom(ZOOM_STEP)),
             ]),
         ]
+
+    def _chapter_items(self) -> list:
+        """The library, as a menu: a chapter added to the end of the board.
+
+        A submenu per fragment holding its variants, because what a designer is
+        choosing is not only *which* chapter but which of its faces -- the icy
+        plateau and the ordinary one are the same chapter and different rooms.
+        """
+        items = []
+        for name, entry in sorted(CHAPTERS().items()):
+            variants = []
+            for variant in entry.variants:
+                item = MenuItem(text=variant)
+                item.on_activate = (lambda widget, name=name, variant=variant:
+                                    self._add_chapter(name, variant))
+                variants.append(item)
+            items.append(MenuItem(text=_titled(name), submenu=variants))
+        return items
+
+    def _add_chapter(self, name: str, variant: str) -> None:
+        """Put a chapter on the end of the board, and frame what is now there."""
+        try:
+            add_chapter(self.editor, name, variant=variant)
+        except (KeyError, ValueError) as error:
+            self._say(str(error))
+            return
+        self._frame_all()
+        rule = CHAPTERS()[name].rule
+        self._say('Added %s/%s%s' % (name, variant, ': ' + rule if rule else ''))
 
     def _mechanism_items(self) -> list:
         """What the mechanism tool puts down, and which it is on."""
