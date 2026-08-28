@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openglcontext-marble-editor"
+dynamic = ["version"]
+description = "The marble board editor: draw a board, put ramps and mechanisms on it, and play it"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mike C. Fletcher", email = "vrplumber@gmail.com" }]
+keywords = ["editor", "OpenGLContext", "OpenGL", "level editor", "game", "marble", "3D"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+
+# The engine draws the map and runs the interface; the game supplies what a
+# board *is* -- its cells, its mechanisms, and the file they live in -- so the
+# editor and the game can never disagree about the format.
+#
+# OpenGLContext-editor is deliberately not here. It is the world-authoring half
+# of the toolkit: DEM terrain, road alignment, 3D Tiles baking. A board is a
+# grid of tiles, and the editor foundation it needs -- the map view, the tool
+# modes, the tool palette, the menus and the dialogs -- is in OpenGLContext
+# itself, which is what glisteel-editor builds its own interface out of too.
+dependencies = [
+    "OpenGLContext>=3.0.0a3",
+    "openglcontext-marble-demo",
+    "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-timeout"]
+dev = ["openglcontext-marble-editor[test]", "ruff", "mypy"]
+
+[project.urls]
+Repository = "https://github.com/mcfletch/marble-editor"
+
+[project.scripts]
+oglc-marble-editor = "marble_editor.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "marble_editor.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["marble_editor*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "B",    # flake8-bugbear
+    "I",    # import ordering
+    "UP",   # pyupgrade
+    "BLE",  # no blind except
+    "S110", # no silent try/except/pass
+]
+ignore = [
+    "E501",   # line too long -- kept readable by hand, as in the engine
+    "E741",   # ambiguous name -- x/y/z read naturally as coordinates
+    "UP031",  # percent formatting, as the engine uses throughout
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The entry module sets the OPENGLCONTEXT_* environment the engine reads at
+# import time, so its imports deliberately are not all at the top.
+"marble_editor/app.py" = ["E402"]
+
+[tool.mypy]
+# 3.12 rather than the 3.10 floor in ``requires-python``: numpy's own stubs use
+# 3.12 type syntax, so checking against 3.10 fails before it reaches any code
+# here. What the floor promises is checked by the test suite, which runs on it.
+python_version = "3.12"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["OpenGLContext.*", "openglcontext_marble_demo.*", "omi_physics.*", "OpenGL.*"]
+ignore_missing_imports = true
+follow_untyped_imports = false
+
+[tool.pytest.ini_options]
+# The package as well as the tests: the modules teach with worked examples, and
+# an example nobody runs drifts away from the code it describes without anything
+# saying so.
+testpaths = ["tests", "marble_editor"]
+addopts = "-ra --doctest-modules"
+timeout = 300
