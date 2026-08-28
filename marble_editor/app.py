@@ -60,6 +60,11 @@ from marble_editor.board import (  # noqa: E402
 from marble_editor.chapters import CHAPTERS, add_chapter  # noqa: E402
 from marble_editor.controls import ZOOM_STEP, MapControls  # noqa: E402
 from marble_editor.editing import MechanismTool, SurfaceTool, editor_tools  # noqa: E402
+from marble_editor.generate import (  # noqa: E402
+    CHAPTER_COUNTS,
+    DIFFICULTIES,
+    generate_story,
+)
 from marble_editor.status import EditorStatus  # noqa: E402
 from marble_editor.tour import default_tour, play  # noqa: E402
 
@@ -367,6 +372,7 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
             ('Board', [
                 MenuItem(text='Clock', submenu=self._clock_items()),
                 Separator(),
+                MenuItem(text='Generate a board', submenu=self._generate_items()),
                 MenuItem(text='Start again from a generated board',
                          on_activate=lambda w: self._regenerate()),
             ]),
@@ -382,6 +388,37 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
                          on_activate=lambda w: self.controls.zoom(ZOOM_STEP)),
             ]),
         ]
+
+    def _generate_items(self) -> list:
+        """How long a board, at what difficulty: a whole one out of the library.
+
+        Length and difficulty as two ladders rather than a form.  Difficulty is
+        a ceiling on what may appear rather than a target, so an easy board is
+        one with nothing expensive on it.
+        """
+        items = []
+        for count in CHAPTER_COUNTS:
+            levels = []
+            for difficulty in DIFFICULTIES:
+                item = MenuItem(text='difficulty %d' % difficulty)
+                item.on_activate = (lambda widget, count=count,
+                                    difficulty=difficulty:
+                                    self._generate(count, difficulty))
+                levels.append(item)
+            items.append(MenuItem(text='%d chapters' % count, submenu=levels))
+        return items
+
+    def _generate(self, chapters: int, difficulty: int) -> None:
+        """Compose a board and open it, keeping the seed so it can be made again."""
+        self.config.seed += 1
+        try:
+            generate_story(self.editor, seed=self.config.seed,
+                           chapters=chapters, difficulty=difficulty)
+        except (KeyError, ValueError) as error:
+            self._say(str(error))
+            return
+        self._frame_all()
+        self._say('Generated %s' % self.editor.level.name)
 
     def _chapter_items(self) -> list:
         """The library, as a menu: a chapter added to the end of the board.

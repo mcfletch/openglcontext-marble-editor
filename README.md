@@ -75,6 +75,25 @@ editor does not offer, or a piece that does not exist, is a step a test catches.
 Recording turns vsync off, because an editor asks for a frame only when
 something changed and a recording wants every frame it can draw.
 
+## Generating a board
+
+**Board → Generate a board → *n* chapters → difficulty *d*** composes a whole
+board out of the library and opens it. It has a rhythm rather than a shuffle:
+places and challenges alternate, it begins and ends somewhere safe, the same
+question is not asked twice running, it gets harder as it goes, and something on
+it has a way round it.
+
+Difficulty is a **ceiling** on what may appear rather than a target, so an easy
+board is one with nothing expensive on it and not one with cheap things forced
+onto it.
+
+Then it is an ordinary board: one press of undo takes the whole thing back, every
+tile is editable, chapters can be added to the end, and it saves like any other.
+That is the reason to generate one inside an editor — a generated board nobody
+can change is somebody else's board, and here you get to disagree with it.
+
+The name carries the seed, so a board worth keeping can be made again.
+
 ## Chapters
 
 The tile tools draw a board one square at a time, which is right for the last
