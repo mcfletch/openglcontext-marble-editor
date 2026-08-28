@@ -37,8 +37,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Recording to video (``--record``).  Optional because the encoder is the one in
+# the graphics driver and not every machine has one the bindings know; without
+# it everything runs as before and asking to record says what is missing.
+video = ["OpenGLContext[video]"]
 test = ["pytest>=7", "pytest-timeout"]
-dev = ["openglcontext-marble-editor[test]", "ruff", "mypy"]
+dev = ["openglcontext-marble-editor[test,video]", "ruff", "mypy"]
 
 [project.urls]
 Repository = "https://github.com/mcfletch/marble-editor"
