@@ -39,11 +39,14 @@ os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
 
 from OpenGLContext import testingcontext  # noqa: E402
 from OpenGLContext.edit.mapview import MapView, MapViewPlatform  # noqa: E402
+from OpenGLContext.events.systemtime import systemTime  # noqa: E402
+from OpenGLContext.physics.demo import disable_vsync  # noqa: E402
 from OpenGLContext.scenegraph.scenegraph import SceneGraph  # noqa: E402
 from OpenGLContext.ui.menu import MenuBar, MenuItem  # noqa: E402
 from OpenGLContext.ui.overlay import OverlayMixin  # noqa: E402
 from OpenGLContext.ui.toolpalette import ToolPalette  # noqa: E402
 from OpenGLContext.ui.widgets import Separator  # noqa: E402
+from OpenGLContext.video.recorder import RecordingMixin  # noqa: E402
 from openglcontext_marble_demo import generator, levelfile  # noqa: E402
 
 from marble_editor import scene  # noqa: E402
@@ -57,6 +60,7 @@ from marble_editor.board import (  # noqa: E402
 from marble_editor.controls import ZOOM_STEP, MapControls  # noqa: E402
 from marble_editor.editing import MechanismTool, SurfaceTool, editor_tools  # noqa: E402
 from marble_editor.status import EditorStatus  # noqa: E402
+from marble_editor.tour import default_tour, play  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +87,7 @@ def board_bounds(level, margin=MARGIN):
             (max(columns) * size + room, max(rows) * size + room))
 
 
-class EditorContext(OverlayMixin, BaseContext):    # pragma: no cover - needs a window
+class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no cover - needs a window
     """The editor's window: a map, a menu bar, and the tools in between."""
 
     config: Any = None
@@ -132,7 +136,49 @@ class EditorContext(OverlayMixin, BaseContext):    # pragma: no cover - needs a 
         # callback with nothing else keeping it alive is collected the moment
         # this returns and the key is silently dead.
         self.addEventHandler('keypress', name='f', function=self._on_frame)
+        # A tour drives the editor through the same handlers a hand does, so a
+        # recording of one is a recording of the editor being used.
+        self.tour = default_tour() if self.config.tour else None
+        self._started = None
+        if self.config.record:
+            # A recording wants frames as fast as they can be drawn.  Left on,
+            # the swap waits for the display, and an editor -- which is
+            # event-driven and asks for a frame only when something changed --
+            # then draws almost none at all.
+            disable_vsync()
+            self.setupRecording(self.config.record, **self.config.record_options)
         print(__doc__)
+
+    # -- showing itself ----------------------------------------------------
+    def screen_of(self, cell: tuple) -> tuple:
+        """The window pixel over the middle of ``cell``.
+
+        The one thing a tour cannot work out for itself, because it depends on
+        where the map is looking.
+        """
+        size = self.editor.level.cell_size
+        x, y = self.view.screen_from_world(
+            (cell[0] * size, 0.0, cell[1] * size), self.getViewPort())
+        return (float(x), float(y))
+
+    def playTour(self) -> None:
+        """Play whatever of the tour has come due."""
+        if self.tour is None:
+            return
+        now = systemTime()
+        if self._started is None:
+            self._started = now
+        for step in self.tour.due(now - self._started):
+            play(step, self, self.screen_of)
+
+    def presentFrame(self) -> Any:
+        """Present the frame, giving it to the recording first.
+
+        The back buffer holds the finished frame only until it is swapped away.
+        """
+        if self.recording:
+            self.tickRecording()
+        return super().presentFrame()
 
     def _reserve_room(self) -> None:
         """Keep the read-outs out from under the bar and beside the palette.
@@ -148,7 +194,10 @@ class EditorContext(OverlayMixin, BaseContext):    # pragma: no cover - needs a 
         self.status.reserved = (MENU_BAR_ROOM, 0.0, 0.0, self.palette.room(metrics))
 
     def OnIdle(self, *args: Any) -> int:
-        """Between frames: put right whatever a resize left stale."""
+        """Between frames: play the tour, and put right what a resize left stale."""
+        self.playTour()
+        if self.recording:
+            self.triggerRedraw(1)       # a recording wants every frame drawn
         metrics = self.overlayMetrics()
         if metrics is not None and float(metrics.scale) != self._reserved_at:
             self._reserve_room()
@@ -410,6 +459,22 @@ def build_parser() -> argparse.ArgumentParser:
                         help='start from a generated board instead of a blank one')
     parser.add_argument('--difficulty', type=int, default=2,
                         help='difficulty of the generated board')
+    parser.add_argument('--size', nargs=2, type=int, default=None,
+                        metavar=('WIDTH', 'HEIGHT'),
+                        help="the window's size in pixels, which is a "
+                             "recording's size too")
+    parser.add_argument('--tour', action='store_true',
+                        help='play a scripted sitting at the editor -- every '
+                             'tool in turn, through the handlers a hand uses')
+    parser.add_argument('--record', metavar='PATH',
+                        help='record the session to PATH (an .mp4) and quit '
+                             'when the recording is done')
+    parser.add_argument('--record-seconds', type=float, default=30.0,
+                        metavar='SECONDS', help='how long a recording runs for')
+    parser.add_argument('--record-fps', type=int, default=30, metavar='FPS',
+                        help='frames a second in the recording')
+    parser.add_argument('--record-bitrate', type=int, default=0, metavar='BITS',
+                        help='bits a second; 0 lets the encoder choose')
     return parser
 
 
@@ -440,10 +505,18 @@ def main(argv=None) -> int:
 
     EditorContext.config = SimpleNamespace(
         level=level, path=path, difficulty=arguments.difficulty,
+        tour=arguments.tour, record=arguments.record,
+        record_options={
+            'fps': arguments.record_fps, 'seconds': arguments.record_seconds,
+            **({'bitrate': arguments.record_bitrate}
+               if arguments.record_bitrate else {})},
         # Where "start again from a generated board" counts from; it moves on
         # each time, so asking again asks for a different board.
         seed=arguments.seed if arguments.seed is not None else 0)
-    EditorContext.ContextMainLoop()
+    if arguments.size:
+        EditorContext.ContextMainLoop(size=tuple(arguments.size))
+    else:
+        EditorContext.ContextMainLoop()
     return 0
 
 

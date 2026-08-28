@@ -55,6 +55,26 @@ Nothing here stops you making a board that is half-drawn: that is a normal thing
 to be looking at, and an editor that refused would be fighting you for the whole
 middle of the work. It says so instead.
 
+## Showing what it does
+
+```bash
+oglc-marble-editor --tour                              # a scripted sitting
+oglc-marble-editor --tour --size 1280 720 \
+    --record editor.mp4 --record-seconds 31            # ...recorded
+```
+
+A **tour** is a list of moments — *at four seconds take the height tool, at five
+drag from here to there* — played back through the same `ProcessEvent` a hand's
+clicks reach, so what it shows is the editor being used rather than an animation
+of it. It runs through every tool in turn and says what it is about to do in the
+read-out.
+
+That is also why it is kept rather than thrown away: a step naming a tool the
+editor does not offer, or a piece that does not exist, is a step a test catches.
+
+Recording turns vsync off, because an editor asks for a frame only when
+something changed and a recording wants every frame it can draw.
+
 ## Boards
 
 A board is a `.marble` file: JSON, one cell to a line and one mechanism to a
