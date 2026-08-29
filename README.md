@@ -116,6 +116,24 @@ chapters in it and an hour of tile edits on top is yours.
 A chapter is **one press of undo**, however many tiles it laid. The finish moves
 to the end of what was added, so chapters chain.
 
+**Story → Add a run of chapters → *length* → *difficulty*** puts a whole composed
+run on the end instead of one chapter: places and challenges alternating, the
+cheap ones first, a run-up in front of anything that has to be arrived at fast,
+and a way round one of them. Board → Generate replaces what is open; this adds to
+it, which is what makes the library something to build a board *out of* rather
+than only something to start from. Also one press of undo.
+
+**Story → Material** chooses what chapters added afterwards are built of — stone,
+metal, ice or rubber — or leaves each one to whatever it prefers. A theme is a
+floor material, a wall material and a sound name together, so choosing one
+decides what the room is made of.
+
+Where two chapters meet, the walls that end up between them are taken out again:
+a piece rails its own edge against the cells it knows about, and the piece laid
+next to it comes afterwards, so a wall that faced the void when it was placed
+would otherwise end up across the way on. Only the walls laid by that step are
+considered — a rail you drew between two of your own tiles is one you meant.
+
 The menu is the library, and the library is discovered by scanning its own
 directory — a fragment added to the game appears here without the editor being
 told about it.

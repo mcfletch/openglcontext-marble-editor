@@ -173,3 +173,89 @@ def test_the_board_a_chapter_built_can_be_played():
     for _ in range(240):
         game.advance(1 / 120.0)
     assert game.state in (PLAYING, 'won', 'lost')
+
+
+# -- a whole story, put on the end of a board -----------------------------------
+
+def test_a_story_can_be_added_to_the_end_of_a_board():
+    """Board -> Generate replaces what is open; this adds to it, which is what
+    makes the library something to build a board out of rather than only
+    something to start from."""
+    from marble_editor.chapters import add_story
+    editor = BoardEditor(blank())
+    before = len(editor.level.cells)
+    assert add_story(editor, seed=3, chapters=4)
+    assert len(editor.level.cells) > before, 'the story laid no board'
+    assert editor.problems() == [], editor.problems()
+
+
+def test_a_story_added_to_a_board_leaves_it_navigable():
+    """A piece walls its own edge against the cells it knows about, and the
+    piece laid next to it comes afterwards -- so a wall that faced the void when
+    it was placed ends up across the way on.  Laid without opening those joins
+    again, a four-chapter story reaches 0 of its 109 cells from the start.
+    """
+    from openglcontext_marble_demo import pieces
+
+    from marble_editor.chapters import add_story
+    editor = BoardEditor(blank())
+    add_story(editor, seed=3, chapters=4)
+    reached = pieces.reachable_through(editor.level)
+    assert pieces.navigable(editor.level), \
+        '%d of %d cells reachable from the start' % (
+            len(reached), len(editor.level.cells))
+
+
+def test_one_chapter_after_another_leaves_a_board_navigable():
+    """The same join-opening, for the other way of assembling a board."""
+    from openglcontext_marble_demo import pieces
+
+    from marble_editor.chapters import add_chapter
+    editor = BoardEditor(blank())
+    for name in ('ramp_down', 'hairpin', 'kicker', 'plateau', 'split'):
+        add_chapter(editor, name)
+    reached = pieces.reachable_through(editor.level)
+    assert pieces.navigable(editor.level), \
+        '%d of %d cells reachable from the start' % (
+            len(reached), len(editor.level.cells))
+
+
+def test_adding_a_story_is_one_press_of_undo():
+    """However many chapters it laid.  It is one thing the designer did."""
+    from marble_editor.chapters import add_story
+    editor = BoardEditor(blank())
+    before = dict(editor.level.cells)
+    add_story(editor, seed=5, chapters=6)
+    assert editor.undo()
+    assert editor.level.cells == before, \
+        'undo left %d cells against the %d it started with' % (
+            len(editor.level.cells), len(before))
+
+
+def test_a_story_never_removes_a_wall_the_designer_drew():
+    """Opening the joins looks only at what this step laid.  A wall between two
+    of the designer's own tiles is a wall they meant, and an editor that quietly
+    removed it would be an editor that cannot draw a rail."""
+    from marble_editor.chapters import add_story
+    editor = BoardEditor(blank())
+    editor.place((0, 1), 'wall')
+    drawn = [f for f in editor.level.features if getattr(f, 'cell', None) == (0, 1)]
+    assert drawn, 'the rail was never drawn'
+    add_story(editor, seed=7, chapters=4)
+    still = [f for f in editor.level.features if getattr(f, 'cell', None) == (0, 1)]
+    assert still == drawn, 'the story took the designer\'s rail off the board'
+
+
+def test_a_story_can_be_asked_for_a_length_and_a_difficulty():
+    import pytest
+
+    from marble_editor.chapters import add_story
+    short = BoardEditor(blank())
+    add_story(short, seed=2, chapters=4)
+    long = BoardEditor(blank())
+    add_story(long, seed=2, chapters=12)
+    assert len(long.level.cells) > len(short.level.cells), \
+        'twelve chapters laid %d cells against four laying %d' % (
+            len(long.level.cells), len(short.level.cells))
+    with pytest.raises(ValueError):
+        add_story(BoardEditor(blank()), chapters=0)

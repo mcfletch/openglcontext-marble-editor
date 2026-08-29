@@ -7,6 +7,13 @@ already there — entered where the board currently ends, leaving somewhere new,
 bringing its own walls, mechanisms and surfaces — and then the tile tools are
 there to change it.
 
+A **story** is several of those at once, composed rather than picked: a run with
+a rhythm to it, getting harder as it goes, with a way round something in the
+middle. :func:`add_story` puts one on the end of the board the same way
+:func:`add_chapter` puts one chapter there, which is what makes the library
+something to build a board *out of* rather than only something to start from.
+Board → Generate replaces what is open; this adds to it.
+
 Which is the whole argument for putting the library in an editor rather than in a
 generator. A generated board is somebody else's board; a board with three
 chapters in it and an hour of tile edits on top is the designer's.
@@ -26,10 +33,21 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from openglcontext_marble_demo import fragments, pieces
+from openglcontext_marble_demo import fragments, pieces, storygen
 from openglcontext_marble_demo.level import Finish
 
-__all__ = ['CHAPTERS', 'entry_port', 'add_chapter']
+__all__ = ['CHAPTERS', 'STORY_LENGTHS', 'THEME_NAMES', 'entry_port',
+           'add_chapter', 'add_story']
+
+#: The lengths of run the menu offers to put on the end of a board.  Shorter than
+#: the ladder Board -> Generate offers, because this one adds to what is there:
+#: a designer reaching for it has a board already and wants a stretch more of it.
+STORY_LENGTHS = (3, 4, 6, 8)
+
+#: The materials a chapter can be asked for, in the order the menu offers them.
+#: A theme is a floor material, a wall material and a sound name together, so
+#: choosing one is choosing what the room is made of rather than recolouring it.
+THEME_NAMES = tuple(sorted(pieces.THEMES))
 
 
 def CHAPTERS() -> dict:
@@ -82,10 +100,64 @@ def add_chapter(editor: Any, name: str, variant: str | None = None,
 
     editor.begin_step()
     try:
+        standing = len(editor.level.features)
         _lay(editor, piece)
+        _open_the_joins(editor.level, standing)
     finally:
         editor.end_step()
     return True
+
+
+def add_story(editor: Any, seed: int | None = None, chapters: int = 4,
+              difficulty: int = 3, themed: bool = True) -> bool:
+    """Append a whole composed run of chapters to ``editor``'s board.
+
+    Entered where the board ends, exactly as one chapter is, and one undoable
+    step however many chapters it lays: it is one thing the designer did.
+
+    ``storygen`` decides what is in it -- places and challenges alternating, the
+    cheap ones first, a run-up in front of anything that has to be arrived at
+    fast, and a way round one of them.  What comes back is laid cell by cell
+    like anything else, so every tile of it is then editable.
+    """
+    if chapters < 1:
+        raise ValueError('a story of %d chapters is not a story' % chapters)
+    seed = editor_seed(editor) if seed is None else seed
+    story = storygen.compose(seed, chapters=chapters, difficulty=difficulty,
+                             themes=list(THEME_NAMES) if themed else None)
+    told = story.build(seed, entry=entry_port(editor.level))
+
+    editor.begin_step()
+    try:
+        standing = len(editor.level.features)
+        for piece in told.placed.values():
+            _lay(editor, piece)
+        # The connectors a story lays between chapters belong to no piece, and
+        # a board without them has a one-cell hole wherever a branch rejoined.
+        for cell, height in told.cells.items():
+            editor.level.cells.setdefault(cell, height)
+        _open_the_joins(editor.level, standing)
+        _finish_at(editor.level, told.finish)
+    finally:
+        editor.end_step()
+    return True
+
+
+def _open_the_joins(level: Any, standing: int) -> None:
+    """Drop the walls just laid that turned out to stand between two floors.
+
+    A piece walls its own edge against the cells *it* knows about, and the piece
+    laid next to it comes afterwards -- so a wall that faced the void when it was
+    placed ends up across the way on.  Every board the game builds is finished
+    this way; a board assembled in the editor needs it for the same reason.
+
+    ``standing`` is how many features the board had before this step, and only
+    what came after it is considered: a wall the designer put down between two
+    of their own tiles is a wall they meant, and an editor that quietly removed
+    it would be an editor that cannot draw a rail.
+    """
+    laid = level.features[standing:]
+    level.features[standing:] = pieces.open_the_joins(level.cells, laid)
 
 
 def editor_seed(editor: Any) -> int:
@@ -109,12 +181,19 @@ def _lay(editor: Any, piece: Any) -> None:
         if isinstance(feature, Finish):
             continue                      # the board has one, and it is moving
         level.features.append(_themed(feature, theme))
-    # The finish goes to the end of what was laid, and the old pad with it.
-    exit_cell = piece.exit.cell
+    _finish_at(level, piece.exit.cell)
+
+
+def _finish_at(level: Any, cell: tuple) -> None:
+    """Move the board's finish to ``cell``, taking the old pad with it.
+
+    A board that still ended where it used to would have the new work hanging
+    off the far side of the pad.
+    """
     level.features = [feature for feature in level.features
                       if not isinstance(feature, Finish)]
-    level.finish_cell = exit_cell
-    level.features.append(Finish(exit_cell))
+    level.finish_cell = cell
+    level.features.append(Finish(cell))
 
 
 def _themed(feature: Any, theme: Any) -> Any:

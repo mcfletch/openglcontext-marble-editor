@@ -57,7 +57,13 @@ from marble_editor.board import (  # noqa: E402
     BoardEditor,
     blank,
 )
-from marble_editor.chapters import CHAPTERS, add_chapter  # noqa: E402
+from marble_editor.chapters import (  # noqa: E402
+    CHAPTERS,
+    STORY_LENGTHS,
+    THEME_NAMES,
+    add_chapter,
+    add_story,
+)
 from marble_editor.controls import ZOOM_STEP, MapControls  # noqa: E402
 from marble_editor.editing import MechanismTool, SurfaceTool, editor_tools  # noqa: E402
 from marble_editor.generate import (  # noqa: E402
@@ -102,6 +108,12 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
     """The editor's window: a map, a menu bar, and the tools in between."""
 
     config: Any = None
+
+    #: The material chapters are built in, or None for whatever each one prefers.
+    #: State of the editor rather than of a chapter: a designer choosing ice is
+    #: deciding what this stretch of the board is made of, and expects the next
+    #: three chapters to be ice as well.
+    chapter_theme: str | None = None
 
     def OnInit(self) -> None:
         self.editor = BoardEditor(self.config.level, on_change=self._board_changed)
@@ -426,8 +438,14 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
         A submenu per fragment holding its variants, because what a designer is
         choosing is not only *which* chapter but which of its faces -- the icy
         plateau and the ordinary one are the same chapter and different rooms.
+
+        Above them, whole runs: a story is several chapters composed with a
+        rhythm, put on the end of the board the same way one chapter is.  And a
+        material, which the chapters added afterwards are built in.
         """
-        items = []
+        items = [MenuItem(text='Add a run of chapters',
+                          submenu=self._story_items()),
+                 MenuItem(text='Material', submenu=self._theme_items())]
         for name, entry in sorted(CHAPTERS().items()):
             variants = []
             for variant in entry.variants:
@@ -438,16 +456,62 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
             items.append(MenuItem(text=_titled(name), submenu=variants))
         return items
 
+    def _story_items(self) -> list:
+        """How long a run to put on the end, and how hard."""
+        items = []
+        for count in STORY_LENGTHS:
+            levels = []
+            for difficulty in DIFFICULTIES:
+                item = MenuItem(text='difficulty %d' % difficulty)
+                item.on_activate = (lambda widget, count=count,
+                                    difficulty=difficulty:
+                                    self._add_story(count, difficulty))
+                levels.append(item)
+            items.append(MenuItem(text='%d chapters' % count, submenu=levels))
+        return items
+
+    def _theme_items(self) -> list:
+        """What the next chapter is built of, or nothing and each keeps its own."""
+        names = (None, *THEME_NAMES)
+        items = [MenuItem(text=_titled(name) if name else 'As the chapter prefers',
+                          checkable=True, checked=(name == self.chapter_theme))
+                 for name in names]
+        for item, name in zip(items, names, strict=True):
+            item.on_activate = (lambda widget, name=name, items=items:
+                                self._choose_theme(name, items))
+        return items
+
+    def _choose_theme(self, name, items) -> None:
+        self.chapter_theme = name
+        for item, offered in zip(items, (None, *THEME_NAMES), strict=True):
+            item.checked = offered == name
+        self._say('Chapters are built in %s'
+                  % (name if name else 'whatever each one prefers'))
+
     def _add_chapter(self, name: str, variant: str) -> None:
         """Put a chapter on the end of the board, and frame what is now there."""
         try:
-            add_chapter(self.editor, name, variant=variant)
+            add_chapter(self.editor, name, variant=variant,
+                        theme=self.chapter_theme)
         except (KeyError, ValueError) as error:
             self._say(str(error))
             return
         self._frame_all()
         rule = CHAPTERS()[name].rule
         self._say('Added %s/%s%s' % (name, variant, ': ' + rule if rule else ''))
+
+    def _add_story(self, chapters: int, difficulty: int) -> None:
+        """Put a composed run of chapters on the end of the board."""
+        self.config.seed += 1
+        try:
+            add_story(self.editor, seed=self.config.seed, chapters=chapters,
+                      difficulty=difficulty,
+                      themed=self.chapter_theme is None)
+        except (KeyError, ValueError) as error:
+            self._say(str(error))
+            return
+        self._frame_all()
+        self._say('Added a run of %d chapters' % chapters)
 
     def _mechanism_items(self) -> list:
         """What the mechanism tool puts down, and which it is on."""
