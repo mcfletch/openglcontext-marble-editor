@@ -4,10 +4,21 @@
 level, so this is where the editor's rules are held: what a board may be, what
 it may not become by accident, and what one press of undo has to give back.
 """
+import dataclasses
+
 import pytest
+from openglcontext_marble_demo import mechanisms
 from openglcontext_marble_demo.level import Bumper, Finish, Ramp, RotatingArm, Wall
 
-from marble_editor.board import HEIGHT_STEP, PLACEABLE_ORDER, BoardEditor, blank
+from marble_editor.board import (
+    BUILT_IN_ORDER,
+    HEIGHT_STEP,
+    PLACEABLE,
+    PLACEABLE_ORDER,
+    BoardEditor,
+    blank,
+    placeable_mechanisms,
+)
 
 
 def _editor(**named):
@@ -118,11 +129,38 @@ def test_an_unknown_surface_is_refused():
 # -- mechanisms ----------------------------------------------------------------
 
 def test_every_offered_mechanism_can_be_placed():
-    editor = _editor(width=5, depth=9)
+    editor = _editor(width=5, depth=len(PLACEABLE_ORDER) + 1)
     for number, kind in enumerate(PLACEABLE_ORDER):
         cell = (1, number)
         assert editor.place(cell, kind), kind
         assert editor.feature_at(cell) is not None, kind
+
+
+def test_the_palette_offers_every_mechanism_the_game_can_put_on_a_cell():
+    """Discovered rather than listed.  A mechanism the game gains is a new file
+    in its own package and nothing else, and one the editor could not place
+    would be one only a generated board ever had."""
+    wanted = {name for name, factory in mechanisms.registry().items()
+              if 'cell' in {f.name for f in dataclasses.fields(factory)}}
+    assert wanted <= set(PLACEABLE_ORDER), \
+        'the palette cannot place %s' % sorted(wanted - set(PLACEABLE_ORDER))
+    assert wanted, 'the game registers no single-cell mechanism at all'
+
+
+def test_a_field_mechanism_is_not_offered_as_something_to_click():
+    """Sand and a burner cover an area.  Placing one is a gesture that paints,
+    and this tool puts a thing on a tile."""
+    for name, (_, factory, _) in PLACEABLE.items():
+        assert hasattr(factory, '__dataclass_fields__'), name
+        assert 'cell' in factory.__dataclass_fields__, \
+            '%r covers a field of cells rather than standing on one' % name
+
+
+def test_the_built_in_pieces_keep_the_front_of_the_palette():
+    """The number keys are muscle memory: a mechanism arriving in the game
+    should not move the ramp off 1."""
+    assert PLACEABLE_ORDER[:len(BUILT_IN_ORDER)] == BUILT_IN_ORDER
+    assert set(placeable_mechanisms()) <= set(PLACEABLE_ORDER)
 
 
 def test_only_one_mechanism_stands_on_a_cell():

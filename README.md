@@ -25,7 +25,7 @@ painting twenty tiles across a board comes back in one press of undo.
 | **Tiles** | `t` | lays tiles; right takes them away |
 | **Height** | `h` | raises a tile a step; right lowers it. A drag *levels* a terrace to the height it started at rather than building a staircase |
 | **Surface** | `u` | paints ice, metal or rubber; right paints the board's own surface back |
-| **Pieces** | `m` | ramps, launch ramps, rails, bumpers, springs, elevators, rotating arms; right clears a cell |
+| **Pieces** | `m` | ramps, launch ramps, rails, bumpers, springs, elevators, rotating arms, and every mechanism the game registers that stands on one cell — doors, levers, magnets, peg boards, rockfalls, water; right clears a cell |
 | **Markers** | `k` | left sets the start, right the finish |
 | **Pan/zoom** | | moves the map, so a drag close in does not gain tiles |
 
@@ -33,6 +33,13 @@ painting twenty tiles across a board comes back in one press of undo.
 mechanism — and the read-out at the bottom says which. Whatever the tool in
 force does not want still moves the map: a drag over open space pans, and the
 wheel zooms.
+
+The palette's second half is **discovered rather than listed**: the game finds
+its mechanisms by scanning its own package directory, so a mechanism it gains is
+a new file there and nothing else, and it appears here without the editor being
+touched. What is not offered is a mechanism that covers a *field* of cells --
+sand, a burner -- because placing one is a gesture that paints an area rather
+than a click on a tile.
 
 A **ramp arrives pointing downhill** and a **rail facing the void**, because the
 board knows both, so placing one is a click rather than a form.

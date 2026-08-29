@@ -30,10 +30,11 @@ file that loads and then drops the marble through the floor.
 from __future__ import annotations
 
 import copy
+import dataclasses
 from collections.abc import Callable
 from typing import Any
 
-from openglcontext_marble_demo import levelfile
+from openglcontext_marble_demo import levelfile, mechanisms
 from openglcontext_marble_demo.level import (
     CELL_SIZE,
     Bumper,
@@ -58,11 +59,12 @@ UNTITLED = 'Untitled'
 #: a designer cannot build a wall by accident.
 HEIGHT_STEP = 0.9
 
-#: The mechanisms the editor puts down, in the order the palette offers them,
-#: with what each is called on screen.  The classes come from the game, and the
-#: names from the file format, so a mechanism the game gains is one line here.
-PLACEABLE_ORDER = ('ramp', 'launch', 'wall', 'bumper', 'spring', 'elevator', 'arm')
-PLACEABLE = {
+#: The pieces the board itself is built out of, in the order the palette offers
+#: them, with what each is called on screen.  The classes come from the game and
+#: the names from the file format, so the editor and the game can never disagree
+#: about what a board holds.
+BUILT_IN_ORDER = ('ramp', 'launch', 'wall', 'bumper', 'spring', 'elevator', 'arm')
+BUILT_IN = {
     'ramp': ('Ramp', Ramp, {}),
     'launch': ('Launch ramp', Ramp, {'launch': True, 'rise': 1.0, 'boost_speed': 7.0}),
     'wall': ('Rail', Wall, {}),
@@ -71,6 +73,41 @@ PLACEABLE = {
     'elevator': ('Elevator', Elevator, {}),
     'arm': ('Rotating arm', RotatingArm, {}),
 }
+
+
+def placeable_mechanisms() -> dict:
+    """Every registered mechanism the editor can put down with one click.
+
+    Discovered rather than listed.  The game finds ``mechanisms/`` by scanning
+    its own directory, so a new mechanism is a new file and nothing else; a
+    palette that had to be edited as well would be exactly the shared file that
+    design exists to avoid, and a mechanism nobody could place would be one
+    only a generated board ever had.
+
+    A mechanism that covers a *field* of cells rather than standing on one --
+    sand, a burner -- is not here.  Placing one is a gesture that paints an area,
+    and the tool that does that is a different tool from this one.
+    """
+    found: dict[str, tuple] = {}
+    for name, factory in sorted(mechanisms.registry().items()):
+        fields = {field.name for field in dataclasses.fields(factory)}
+        if 'cell' in fields:
+            found[name] = (factory.__name__, factory, {})
+    return found
+
+
+def _palette() -> tuple[tuple, dict]:
+    """The order the palette offers, and what each entry puts down."""
+    offered = dict(BUILT_IN)
+    order = list(BUILT_IN_ORDER)
+    for name, entry in placeable_mechanisms().items():
+        if name not in offered:
+            offered[name] = entry
+            order.append(name)
+    return tuple(order), offered
+
+
+PLACEABLE_ORDER, PLACEABLE = _palette()
 
 #: The surfaces a cell can be painted with; the first is "no override".
 SURFACE_NAMES = ('stone', *sorted(name for name in SURFACES if name != 'stone'))

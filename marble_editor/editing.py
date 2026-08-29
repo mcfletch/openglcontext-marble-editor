@@ -207,7 +207,7 @@ class MechanismTool(_BoardTool):
 
     @property
     def kind_label(self) -> str:
-        return PLACEABLE[self.kind][0]
+        return str(PLACEABLE[self.kind][0])
 
 
 @dataclass
