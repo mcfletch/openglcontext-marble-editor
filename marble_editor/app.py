@@ -36,6 +36,12 @@ from typing import Any
 
 os.environ.setdefault('OPENGLCONTEXT_BACKEND', 'glfw')
 os.environ.setdefault('OPENGLCONTEXT_RENDERER', 'pbr')
+# Every session is recorded unless the caller says otherwise.  What goes wrong in
+# an editor goes wrong at a moment -- a piece drawn where the board says it is
+# not -- and a journal is what says which moment and what was on screen at it.
+# ``1`` means a dated file under the application-data directory; the path is
+# printed at startup so it can be quoted.  ``--no-telemetry`` turns it off.
+os.environ.setdefault('OPENGLCONTEXT_TELEMETRY', '1')
 
 from OpenGLContext import testingcontext  # noqa: E402
 from OpenGLContext.edit.mapview import MapView, MapViewPlatform  # noqa: E402
@@ -116,6 +122,7 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
     chapter_theme: str | None = None
 
     def OnInit(self) -> None:
+        _say_where_the_journal_is(self)
         self.editor = BoardEditor(self.config.level, on_change=self._board_changed)
         self.editor.path = self.config.path
         self.view = MapView(centre=(0.0, 0.0), span=80.0, smallest=8.0,
@@ -603,6 +610,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--tour', action='store_true',
                         help='play a scripted sitting at the editor -- every '
                              'tool in turn, through the handlers a hand uses')
+    parser.add_argument('--telemetry', metavar='PATH',
+                        help='record the session -- every input against the '
+                             'frame that acted on it -- to PATH (a .jsonl). '
+                             'Recording is on by default, to a dated file under '
+                             'the application-data directory')
+    parser.add_argument('--no-telemetry', action='store_true',
+                        help='do not record this session')
     parser.add_argument('--record', metavar='PATH',
                         help='record the session to PATH (an .mp4) and quit '
                              'when the recording is done')
@@ -631,9 +645,25 @@ def starting_level(arguments):
     return blank(), None
 
 
+def _say_where_the_journal_is(context) -> None:
+    """Print the session journal's path, if this session is being recorded.
+
+    Printed rather than logged: it is the one thing to quote when something goes
+    wrong, and a warning in a log nobody is watching is a path nobody has.
+    """
+    journal = getattr(getattr(context, 'telemetry', None), 'journal', None)
+    path = getattr(journal, 'path', None)
+    if path is not None and not getattr(journal, 'disabled', False):
+        print('Recording this session to %s' % (path,))
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO)
     arguments = build_parser().parse_args(argv)
+    if arguments.no_telemetry:
+        os.environ.pop('OPENGLCONTEXT_TELEMETRY', None)
+    elif arguments.telemetry:
+        os.environ['OPENGLCONTEXT_TELEMETRY'] = arguments.telemetry
     try:
         level, path = starting_level(arguments)
     except (OSError, ValueError) as error:

@@ -138,6 +138,20 @@ The menu is the library, and the library is discovered by scanning its own
 directory — a fragment added to the game appears here without the editor being
 told about it.
 
+## Reporting what went wrong
+
+Every session is recorded. The editor writes a journal — every input against the
+frame that acted on it — to a dated file under the application-data directory,
+and prints the path when it starts:
+
+```
+Recording this session to /home/you/.local/share/OpenGLContext/…jsonl
+```
+
+Quote that path when something goes wrong and the run can be played back frame
+for frame with `OPENGLCONTEXT_TELEMETRY_REPLAY`. `--telemetry PATH` writes
+somewhere of your choosing; `--no-telemetry` turns it off.
+
 ## Boards
 
 A board is a `.marble` file: JSON, one cell to a line and one mechanism to a
