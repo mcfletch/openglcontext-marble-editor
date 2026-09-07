@@ -12,4 +12,4 @@ the format — and nothing but :mod:`marble_editor.app` knows there is a window.
     oglc-marble-editor spiral.marble   # carry on with one
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0a1"
