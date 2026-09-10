@@ -48,7 +48,7 @@ class _BoardTool(ToolMode):
     on_change: Callable[[], None] | None = None
     _dragging: bool = field(default=False, repr=False)
 
-    def cell(self, pointer: Pointer):
+    def cell(self, pointer: Pointer) -> tuple[int, int] | None:
         """The cell under ``pointer``, or None where it is over nothing."""
         if pointer.world is None:
             return None
@@ -58,11 +58,12 @@ class _BoardTool(ToolMode):
 
     # -- the gesture -------------------------------------------------------
     def on_press(self, pointer: Pointer) -> bool:
-        if pointer.button not in (LEFT, RIGHT) or self.cell(pointer) is None:
+        cell = self.cell(pointer)
+        if pointer.button not in (LEFT, RIGHT) or cell is None:
             return False
         self.editor.begin_step()
         self._dragging = True
-        self.apply(self.cell(pointer), pointer)
+        self.apply(cell, pointer)
         self._changed()
         return True
 
@@ -101,7 +102,7 @@ class _BoardTool(ToolMode):
             self.on_change()
 
     # -- what this tool actually does --------------------------------------
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         """Change ``cell``.  Overridden by every tool."""
         return False
 
@@ -114,7 +115,7 @@ class TileTool(_BoardTool):
     label: str = 'Tiles'
     shortcut: str = 't'
 
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         if pointer.button == RIGHT:
             return self.editor.erase(cell)
         return self.editor.lay(cell)
@@ -145,7 +146,7 @@ class HeightTool(_BoardTool):
             self.editor.level.cells[cell] + steps * HEIGHT_STEP, 6)
         return super().on_press(pointer)
 
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         if self._target is None:
             return False
         return self.editor.level_to(cell, self._target)
@@ -165,11 +166,12 @@ class SurfaceTool(_BoardTool):
     shortcut: str = 'u'
     surface: str = SURFACE_NAMES[1] if len(SURFACE_NAMES) > 1 else SURFACE_NAMES[0]
 
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         wanted = self.editor.level.surface if pointer.button == RIGHT else self.surface
         return self.editor.paint(cell, wanted)
 
-    def on_key(self, name: str, modifiers) -> bool:
+    def on_key(self, name: str,
+                   modifiers: tuple[int, int, int]) -> bool:
         """1..n choose which surface the pointer paints."""
         if name.isdigit() and 1 <= int(name) <= len(SURFACE_NAMES):
             self.surface = SURFACE_NAMES[int(name) - 1]
@@ -193,12 +195,13 @@ class MechanismTool(_BoardTool):
     shortcut: str = 'm'
     kind: str = PLACEABLE_ORDER[0]
 
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         if pointer.button == RIGHT:
             return self.editor.clear(cell)
         return self.editor.place(cell, self.kind)
 
-    def on_key(self, name: str, modifiers) -> bool:
+    def on_key(self, name: str,
+                   modifiers: tuple[int, int, int]) -> bool:
         if name.isdigit() and 1 <= int(name) <= len(PLACEABLE_ORDER):
             self.kind = PLACEABLE_ORDER[int(name) - 1]
             self._changed()
@@ -224,7 +227,7 @@ class MarkerTool(_BoardTool):
     label: str = 'Markers'
     shortcut: str = 'k'
 
-    def apply(self, cell, pointer: Pointer) -> bool:
+    def apply(self, cell: tuple[int, int], pointer: Pointer) -> bool:
         if pointer.button == RIGHT:
             return self.editor.set_finish(cell)
         return self.editor.set_start(cell)

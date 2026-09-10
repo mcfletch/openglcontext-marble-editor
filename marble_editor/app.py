@@ -93,12 +93,12 @@ MENU_BAR_ROOM = 30.0
 MARGIN = 0.15
 
 
-def _titled(name):
+def _titled(name: str) -> str:
     """A fragment's name as a menu reads it."""
     return name.replace('_', ' ').capitalize()
 
 
-def board_bounds(level, margin=MARGIN):
+def board_bounds(level: Any, margin: float = MARGIN) -> Any:
     """The world corners of a board, with room round the outside."""
     size = level.cell_size
     if not level.cells:
@@ -169,7 +169,8 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
         # A tour drives the editor through the same handlers a hand does, so a
         # recording of one is a recording of the editor being used.
         self.tour = default_tour() if self.config.tour else None
-        self._started = None
+        #: When the tour started, so a step's cue is measured from it.
+        self._started: float | None = None
         if self.config.record:
             # A recording wants frames as fast as they can be drawn.  Left on,
             # the swap waits for the display, and an editor -- which is
@@ -339,6 +340,14 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
         self._say('Nothing to redo.')
         return True
 
+    # The menu wants a callback that answers nothing; the key handler wants one
+    # that says whether the key was taken. These are the menu's half.
+    def _undoChosen(self, widget: Any) -> None:
+        self._undo()
+
+    def _redoChosen(self, widget: Any) -> None:
+        self._redo()
+
     def _play(self) -> None:
         """Save the board and play it, in a window of its own.
 
@@ -384,9 +393,9 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
             ]),
             ('Edit', [
                 MenuItem(text='Undo', shortcut='<ctrl-z>',
-                         on_activate=lambda w: self._undo()),
+                         on_activate=self._undoChosen),
                 MenuItem(text='Redo', shortcut='<ctrl-y>',
-                         on_activate=lambda w: self._redo()),
+                         on_activate=self._redoChosen),
             ]),
             ('Board', [
                 MenuItem(text='Clock', submenu=self._clock_items()),
@@ -488,7 +497,7 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
                                 self._choose_theme(name, items))
         return items
 
-    def _choose_theme(self, name, items) -> None:
+    def _choose_theme(self, name: str | None, items: list) -> None:
         self.chapter_theme = name
         for item, offered in zip(items, (None, *THEME_NAMES), strict=True):
             item.checked = offered == name
@@ -520,9 +529,23 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
         self._frame_all()
         self._say('Added a run of %d chapters' % chapters)
 
+    def _tool(self, name: str, kind: type) -> Any:
+        """The tool this editor registered under a name.
+
+        `ToolManager.named` answers None for a name nobody registered, which
+        here would be this editor asking for a tool it built itself -- so it
+        says which name, rather than leaving an AttributeError to be read at
+        the line that used the answer.
+        """
+        tool = self.tools.named(name)
+        if not isinstance(tool, kind):
+            raise LookupError(
+                "the editor's %r tool is not registered" % (name,))
+        return tool
+
     def _mechanism_items(self) -> list:
         """What the mechanism tool puts down, and which it is on."""
-        tool = self.tools.named('mechanisms')
+        tool = self._tool('mechanisms', MechanismTool)
         items = [MenuItem(text='%s  (%d)' % (PLACEABLE[kind][0], number),
                           checkable=True, checked=(kind == tool.kind))
                  for number, kind in enumerate(PLACEABLE_ORDER, start=1)]
@@ -534,12 +557,12 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
     def _choose_mechanism(self, kind: str, items: list) -> None:
         for item, offered in zip(items, PLACEABLE_ORDER, strict=True):
             item.checked = (offered == kind)
-        self.tools.named('mechanisms').kind = kind
+        self._tool('mechanisms', MechanismTool).kind = kind
         self.tools.select('mechanisms')
         self._report()
 
     def _surface_items(self) -> list:
-        tool = self.tools.named('surface')
+        tool = self._tool('surface', SurfaceTool)
         items = [MenuItem(text='%s  (%d)' % (name, number), checkable=True,
                           checked=(name == tool.surface))
                  for number, name in enumerate(SURFACE_NAMES, start=1)]
@@ -551,7 +574,7 @@ class EditorContext(RecordingMixin, OverlayMixin, BaseContext):    # pragma: no 
     def _choose_surface(self, name: str, items: list) -> None:
         for item, offered in zip(items, SURFACE_NAMES, strict=True):
             item.checked = (offered == name)
-        self.tools.named('surface').surface = name
+        self._tool('surface', SurfaceTool).surface = name
         self.tools.select('surface')
         self._report()
 
@@ -629,7 +652,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def starting_level(arguments):
+def starting_level(arguments: Any) -> tuple[Any, str | None]:
     """The board the editor opens on, and where it came from.
 
     Three ways in, in the order they are asked for: a file named on the command
@@ -645,7 +668,7 @@ def starting_level(arguments):
     return blank(), None
 
 
-def _say_where_the_journal_is(context) -> None:
+def _say_where_the_journal_is(context: Any) -> None:
     """Print the session journal's path, if this session is being recorded.
 
     Printed rather than logged: it is the one thing to quote when something goes
@@ -657,7 +680,7 @@ def _say_where_the_journal_is(context) -> None:
         print('Recording this session to %s' % (path,))
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO)
     arguments = build_parser().parse_args(argv)
     if arguments.no_telemetry:

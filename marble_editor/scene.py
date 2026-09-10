@@ -28,9 +28,13 @@ something a test can ask about.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 import numpy as np
 from OpenGLContext.scenegraph.basenodes import (
     Appearance,
+    Background,
     Coordinate,
     Group,
     IndexedFaceSet,
@@ -89,14 +93,15 @@ LIGHT_HIGH = 1.35
 LIGHT_LOW = 0.55
 
 
-def _unlit(color):
+def _unlit(color: Sequence[float]) -> Appearance:
     """An appearance that draws exactly the colour it is given."""
     return Appearance(material=PBRMaterial(
         baseColor=tuple(color), emissiveColor=tuple(color),
         metallic=0.0, roughness=1.0, unlit=True))
 
 
-def _shade(color, height, lowest, highest):
+def _shade(color: Sequence[float], height: float, lowest: float,
+           highest: float) -> tuple[float, ...]:
     """``color`` lightened toward the top of the board and darkened toward the
     bottom, so a terrace reads as a terrace."""
     span = highest - lowest
@@ -114,16 +119,17 @@ class _Faces:
     renderer takes a colour from.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.by_colour: dict = {}
 
-    def add(self, colour, corners):
+    def add(self, colour: Sequence[float],
+            corners: Sequence[Any]) -> None:
         points, index = self.by_colour.setdefault(_key(colour), ([], []))
         at = len(points)
         points.extend(corners)
         index.extend(list(range(at, at + len(corners))) + [-1])
 
-    def group(self):
+    def group(self) -> Group | None:
         children = [
             Shape(geometry=IndexedFaceSet(coord=Coordinate(point=points),
                                           coordIndex=index, solid=False),
@@ -132,13 +138,13 @@ class _Faces:
         return Group(children=children) if children else None
 
 
-def _key(colour):
+def _key(colour: Sequence[float]) -> tuple[float, ...]:
     """A colour rounded to what an eye can tell apart, so near-identical
     shades share a shape instead of each getting one."""
     return tuple(round(float(channel), 3) for channel in colour)
 
 
-def tiles(level):
+def tiles(level: Any) -> Group | None:
     """One flat quad per cell, coloured by surface and shaded by height."""
     if not level.cells:
         return None
@@ -156,7 +162,7 @@ def tiles(level):
     return faces.group()
 
 
-def grid(level):
+def grid(level: Any) -> Shape | None:
     """A line round every cell, so the squares a designer clicks are visible."""
     if not level.cells:
         return None
@@ -176,12 +182,13 @@ def grid(level):
                  appearance=_unlit(GRID_COLOUR))
 
 
-def _diamond(faces, x, z, y, radius, colour):
+def _diamond(faces: _Faces, x: float, z: float, y: float, radius: float,
+             colour: Sequence[float]) -> None:
     faces.add(colour, [(x, y, z - radius), (x + radius, y, z),
                        (x, y, z + radius), (x - radius, y, z)])
 
 
-def marks(level):
+def marks(level: Any) -> Group | None:
     """A mark per mechanism, and one each for the start and the finish."""
     size = level.cell_size
     radius = size * MARK_SIZE
@@ -212,7 +219,8 @@ def marks(level):
     return faces.group()
 
 
-def _rail(faces, wall, x, z, y, size, colour):
+def _rail(faces: _Faces, wall: Any, x: float, z: float, y: float,
+          size: float, colour: Sequence[float]) -> None:
     """A rail is drawn where it stands: a bar along one edge of the cell."""
     dcol, drow = Wall._OFFSET[wall.side]
     half = size * 0.5
@@ -226,7 +234,8 @@ def _rail(faces, wall, x, z, y, size, colour):
                        (centre_x - along_x, y, centre_z + along_z)])
 
 
-def _tick(faces, x, z, y, direction, size, colour):
+def _tick(faces: _Faces, x: float, z: float, y: float, direction: Any,
+          size: float, colour: Sequence[float]) -> None:
     """A stub along the way something points, so a ramp's direction is visible."""
     step = np.array([direction[0], 0.0, direction[1]], dtype='d')
     length = np.linalg.norm(step)
@@ -239,10 +248,16 @@ def _tick(faces, x, z, y, direction, size, colour):
                        (x - across[0], y, z - across[2])])
 
 
-def board_scene(level, background=BACKGROUND):
-    """The whole map: tiles, the grid over them, and the marks over that."""
-    children = [shape for shape in (tiles(level), grid(level), marks(level))
-                if shape is not None]
-    scene = SceneGraph(children=children)
-    scene.background = background
-    return scene
+def board_scene(level: Any,
+                background: Sequence[float] = BACKGROUND) -> SceneGraph:
+    """The whole map: tiles, the grid over them, and the marks over that.
+
+    A ``Background`` node leads the children, which is how a scene says what
+    the frame is cleared to: the ground the board floats over is dark, so the
+    board's edge is where the drawing stops rather than something to look for.
+    """
+    children: list[Any] = [Background(skyColor=[tuple(background)])]
+    children.extend(shape for shape in
+                    (tiles(level), grid(level), marks(level))
+                    if shape is not None)
+    return SceneGraph(children=children)

@@ -88,6 +88,12 @@ ignore = [
 # 3.12 type syntax, so checking against 3.10 fails before it reaches any code
 # here. What the floor promises is checked by the test suite, which runs on it.
 python_version = "3.12"
+# Every definition states its types, and a body is checked rather than skipped:
+# an unannotated parameter is `Any`, and an `Any` travelling through a call is
+# a check that reports success without having compared anything.
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 warn_return_any = true
 warn_unused_ignores = true
 ignore_missing_imports = true

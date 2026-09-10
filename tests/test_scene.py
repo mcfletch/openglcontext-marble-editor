@@ -164,9 +164,26 @@ def test_a_mechanism_on_a_cell_that_is_not_there_is_not_drawn():
 
 def test_the_map_is_tiles_then_the_grid_then_the_marks():
     """Drawn in that order so nothing that matters is under something else."""
+    from OpenGLContext.scenegraph.basenodes import Background
+
     level = generator.generate(seed=3, difficulty=2)
     graph = scene.board_scene(level)
-    assert len(graph.children) == 3
+    assert len(graph.children) == 4
+    assert isinstance(graph.children[0], Background)
+
+
+def test_the_board_says_what_the_frame_is_cleared_to():
+    """A Background node, which is how a scene says it: set on the graph as a
+    plain attribute it reached nothing, and the editor drew on whatever the
+    window happened to start with."""
+    from OpenGLContext.scenegraph.basenodes import Background
+
+    level = generator.generate(seed=3, difficulty=2)
+    graph = scene.board_scene(level, background=(0.2, 0.3, 0.4))
+    background = graph.children[0]
+    assert isinstance(background, Background)
+    assert [round(float(channel), 3) for channel in background.skyColor[0]] == [
+        0.2, 0.3, 0.4]
 
 
 def test_every_generated_board_can_be_drawn():

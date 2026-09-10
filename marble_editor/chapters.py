@@ -75,7 +75,7 @@ def _outward(level: Any, cell: tuple) -> tuple:
     goes where there is room.  Downhill (+row) breaks a tie, because that is the
     way the board leans and the way a player is already going.
     """
-    def behind(step):
+    def behind(step: tuple[int, int]) -> int:
         return sum(1 for reach in range(1, 5)
                    if (cell[0] + step[0] * reach,
                        cell[1] + step[1] * reach) in level.cells)

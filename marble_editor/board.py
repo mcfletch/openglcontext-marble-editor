@@ -116,7 +116,8 @@ _SIDES = {(0, -1): 'N', (0, 1): 'S', (1, 0): 'E', (-1, 0): 'W'}
 NEIGHBOURS = tuple(_SIDES)
 
 
-def blank(width=5, depth=8, cell_size=CELL_SIZE):
+def blank(width: int = 5, depth: int = 8,
+          cell_size: float = CELL_SIZE) -> Any:
     """A rectangle of flat tiles to start drawing on.
 
     A board with nothing in it is a board a designer cannot see, so a new one is
